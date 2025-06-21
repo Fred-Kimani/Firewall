@@ -1,5 +1,7 @@
 .App {
   text-align: center;
+  margin-top : auto;
+  background-color: black;
 }
 
 .App-logo {
@@ -22,10 +24,12 @@
   justify-content: center;
   font-size: calc(10px + 2vmin);
   color: white;
+  margin-top:auto;
 }
 
 .App-link {
   color: #61dafb;
+  background-color: #61dafb;
 }
 
 @keyframes App-logo-spin {
@@ -35,4 +39,277 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+
+.MainWAFScreen {
+
+  text-align: center;
+  border: 2px solid black;
+  padding: auto;
+  margin: 270px auto;
+  margin-top:auto;
+  width: 30px;
+  height: auto;
+  background-color:blueviolet;
+  border-radius: 10px;
+  font-style: italic;
+  font-size: 20px;
+  font-variant: inherit;
+  font-weight: 1000;
+  color:chartreuse;
+
+}
+
+.MainWAFScreen th{
+
+    text-align : center;
+    padding : 20px;
+    margin :50px auto;
+    background-color:#61dafb;
+    margin-top:auto;
+
+}
+
+.MainWAFScreen td {
+
+   text-align:center;
+   padding : 50px;
+   margin : 50px;
+   background-color: #305b68;
+   border-radius: 10px;
+   margin-top:auto;
+
+}
+
+h1 {
+  color:blue;
+  font-size: 230px;
+  text-align: center;
+  margin-top: 30px;
+}
+
+Button{
+
+   text-align:center;
+   color :#1f3809;
+   background-color: #282c34;
+   background: linear-gradient(
+    270deg,
+    red,
+    orange,
+    yellow,
+    green,
+    indigo,
+    violet,
+    red
+  );
+   background-size: 1600% 1600%;
+   animation: rainbowAnimation 3s ease infinite;
+   font-size: 30px;
+   font-weight: bold;
+   font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+   font-style: initial;
+
+   margin:40px auto;
+   padding:5px 15px;
+
+   border-width: 10px;
+   border-radius: 5px;
+   overflow: hidden;
+   cursor : pointer;
+   z-index:1;
+   position:relative;
+   box-shadow: 5px 5px 0px black;
+
+}
+
+@keyframes rainbowAnimation{
+
+  50%{
+    background-position: 0% 200%;
+  }
+  100%{
+    background-position: 200% 0%;
+  }
+  0%{
+    background-position: 200% 200%;
+  }
+
+}
+
+
+
+.Div1{
+
+   border-radius: 10px;
+   border-style:solid;
+   border-width: 20px;
+   border-color: #282c34;
+   text-align:center;
+   margin-top:auto;
+   background: linear-gradient(
+    120deg,
+    red,
+    orange,
+    yellow,
+    green,
+    violet,
+    red,
+    blue
+  );
+   background-size: 500% 500%;
+   animation: rainbowAnimation2 3s ease infinite;
+
+}
+
+@keyframes rainbowAnimation2{
+
+   50%{
+      background-position: 0% 200%;
+   }
+   0%{
+      background-position: 200% 200%;
+   }
+   100%{
+      background-position: 200% 0%;
+   }
+
+}
+
+.Div2{
+
+   background-color:blue;
+   border-radius: 10px;
+   border-color : black;
+   border-style:groove;
+   border-width: 30px;
+   border-color:antiquewhite;
+   text-align:center;
+   margin: 1px auto;
+   padding: 1px auto;
+   height: 30px auto;
+
+}
+
+.button-container{
+
+   margin: 40px auto;
+   padding : 30px auto;
+
+}
+
+.InputBox{
+
+   background-color:burlywood;
+   border-radius: 5px;
+   border-width: 5px;
+   border-style: double;
+   border-color:aqua;
+   text-align:center;
+   padding : 5px;
+   margin : 5px;
+   margin-top:auto;
+   font-size: 20px;
+   font-family:'Times New Roman', Times, serif;
+   font-style: italic;
+   font-weight: bolder;
+   transition: box-shadow 0.3s ease;
+
+}
+
+.InputBox:focus{
+   outline:auto;
+   box-shadow: 0 0 15px rgba(0 ,0 , 1000 , 1000);
+   color:deepskyblue black green;
+   size:20px;
+
+}
+
+.InputBox::placeholder{
+
+   font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+   font-variant: small-caps;
+   text-shadow: 0 0 15px rgba(0 ,0 , 0 , 0.3);
+   color:rgb(65, 88, 19);
+   letter-spacing: 1px;
+
+}
+
+.Th{
+
+   border-radius: 10px;
+   color:brown;
+   font-style: italic;
+   font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+   font-size: 50px;
+   font-feature-settings: "aalt";
+   margin : auto;
+   padding: auto;
+
+}
+
+.Tr{
+
+   border-radius: 10px;
+   color:chocolate;
+
+}
+
+.Tbody{
+
+   border-radius:10px;
+   font-style:inherit;
+
+}
+
+.title1{
+
+   color:black;
+   font-size: 30px;
+   font-family: 'Courier New', Courier, monospace;
+   font-weight: bolder;
+   font-style: normal;
+
+}
+
+
+.title2::before{
+ 
+  content: "\26A0";
+  color:black;
+
+}
+
+.title2{
+
+  color:black;
+  font-size: 40px;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: bolder;
+  font-style: oblique;
+  border-color:#282c34;
+  border-style: double;
+  background: linear-gradient(
+    180deg,
+    red,
+    orange,
+    yellow,
+    green,
+    red,
+    darkred,
+    blue,
+    darkblue,
+    red
+  );
+   background-size: 3000% 3000%;
+   animation: rainbowAnimation2 3s ease infinite;
+
+}
+
+.title2::after{
+
+  content: "\26A0";
+  color:black;
+
 }
