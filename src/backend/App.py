@@ -1,104 +1,155 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import re
 import logging
-from datetime import datetime
 import time
+import os
 
-
-app = Flask(__name__)
-# Connect to the frontend
+app = Flask(__name__, static_folder="static")
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
 
+# Logging to file
+LOG_FILE = 'waf.log'
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.WARNING,
+    format='%(asctime)s - %(message)s'
+)
 
-logging.basicConfig(filename='waf.log', level=logging.WARNING, format='%(asctime)s - %(message)s')
-
-# --- For Anomaly Detection (Rate Limiting) ---
 request_tracker = {}
-blocked_ips = {}  
+blocked_ips = {}
 
-
-#Block Sql Injections
+# 1) SQLi rules, with an extra pattern to catch "' OR '1'='1"
 SQLI_RULES = [
+    re.compile(r"'\s*OR\s*'\d'\s*=\s*'\d", re.IGNORECASE),
     re.compile(r"(\s*')\s*OR\s*'\d'\s*=\s*'\d'", re.IGNORECASE),
     re.compile(r"(\s*')\s*OR\s*(\d+)=(\d+)", re.IGNORECASE),
     re.compile(r"UNION\s+SELECT", re.IGNORECASE),
     re.compile(r"DROP\s+TABLE", re.IGNORECASE),
     re.compile(r"(--|\#|;)", re.IGNORECASE)
 ]
-#Protect from XSS
+
+# 2) XSS
 XSS_RULES = [
     re.compile(r"<script.*?>.*?</script>", re.IGNORECASE | re.DOTALL),
-    # THIS IS THE FIXED RULE for onerror, onload, etc.
     re.compile(r"on\w+\s*=", re.IGNORECASE),
-    re.compile(r"javascript\s*:", re.IGNORECASE)
+    re.compile(r"javascript\s*:", re.IGNORECASE),
+    re.compile(r"<img[^>]+src=['\"]?javascript:", re.IGNORECASE),
+    re.compile(r"<iframe.*?>", re.IGNORECASE)
 ]
 
-def check_for_attack(input_string):
+# 3) Command Injection
+CMD_INJECTION_RULES = [
+    re.compile(r";\s*(ls|cat|pwd|whoami|echo)", re.IGNORECASE),
+    re.compile(r"\|\s*(ls|cat|whoami)", re.IGNORECASE)
+]
+
+# 4) Local File Inclusion
+LFI_RULES = [
+    re.compile(r"\.\./", re.IGNORECASE),
+    re.compile(r"/etc/passwd", re.IGNORECASE)
+]
+
+# 5) Remote File Inclusion / SSRF
+RFI_RULES = [
+    re.compile(r"https?://[^\s]+", re.IGNORECASE),
+    re.compile(r"file://", re.IGNORECASE)
+]
+
+# 6) Path Traversal
+PATH_TRAVERSAL_RULES = [
+    re.compile(r"\.\./", re.IGNORECASE),
+    re.compile(r"[a-zA-Z]:\\", re.IGNORECASE)
+]
+
+# 7) Malicious User-Agent
+USER_AGENT_RULES = [
+    re.compile(r"(sqlmap|nmap|nikto)", re.IGNORECASE)
+]
+
+# Rate-limiting parameters
+ANOMALY_RATE_LIMIT = 20
+BLOCK_DURATION = 300  # seconds
+TIME_WINDOW = 60      # seconds
+
+def check_for_attack(input_string, user_agent):
     for rule in SQLI_RULES:
         if rule.search(input_string):
-            return True, f"SQLI-Rule-{SQLI_RULES.index(rule)}"
+            return True, f"SQLi-{SQLI_RULES.index(rule)}"
     for rule in XSS_RULES:
         if rule.search(input_string):
-            return True, f"XSS-Rule-{XSS_RULES.index(rule)}"
+            return True, f"XSS-{XSS_RULES.index(rule)}"
+    for rule in CMD_INJECTION_RULES:
+        if rule.search(input_string):
+            return True, f"CMD-{CMD_INJECTION_RULES.index(rule)}"
+    for rule in LFI_RULES:
+        if rule.search(input_string):
+            return True, f"LFI-{LFI_RULES.index(rule)}"
+    for rule in RFI_RULES:
+        if rule.search(input_string):
+            return True, f"RFI-{RFI_RULES.index(rule)}"
+    for rule in PATH_TRAVERSAL_RULES:
+        if rule.search(input_string):
+            return True, f"PathTraversal-{PATH_TRAVERSAL_RULES.index(rule)}"
+    for rule in USER_AGENT_RULES:
+        if rule.search(user_agent):
+            return True, f"UserAgent-{USER_AGENT_RULES.index(rule)}"
     return False, None
-
-#API endpoint
 
 @app.route("/api/process", methods=["POST"])
 def process_request():
     source_ip = request.remote_addr
-    current_time = time.time()
+    user_agent = request.headers.get("User-Agent", "")
+    now = time.time()
 
-    # --- Anomaly Detection Logic ---
-    # First, check if the IP is in the blocked list
-    if source_ip in blocked_ips:
-        if current_time < blocked_ips[source_ip]:
-            return jsonify({"error": "Too Many Requests", "message": "Your IP is temporarily blocked."}), 429
-        else:
-            # The block time is over, so unblock them
-            del blocked_ips[source_ip]
-            del request_tracker[source_ip]
+    # Unblock if block time expired
+    if source_ip in blocked_ips and now >= blocked_ips[source_ip]:
+        del blocked_ips[source_ip]
+        request_tracker.pop(source_ip, None)
 
-    # Keep track of requests for this IP
-    if source_ip not in request_tracker:
-        request_tracker[source_ip] = []
-    
-    # Remove old requests from the list that are outside the time window
+    # Initialize or purge old timestamps
+    request_tracker.setdefault(source_ip, [])
+    request_tracker[source_ip] = [
+        ts for ts in request_tracker[source_ip]
+        if now - ts < TIME_WINDOW
+    ]
 
-    TIME_WINDOW = 60  
-    request_tracker[source_ip] = [ts for ts in request_tracker[source_ip] if current_time - ts < TIME_WINDOW]
+    # Rate limit: only count successful requests (tracked below)
+    if len(request_tracker[source_ip]) > ANOMALY_RATE_LIMIT:
+        blocked_ips[source_ip] = now + BLOCK_DURATION
+        logging.warning(f"ANOMALY - IP {source_ip} blocked for too many requests")
+        return jsonify({"error": "Too Many Requests"}), 429
 
-    # This logic blocks on the 21st request
-    BLOCK_DURATION = 300
-    REQUEST_LIMIT = 20
-
-    if len(request_tracker[source_ip]) >= REQUEST_LIMIT:
-        blocked_ips[source_ip] = current_time + BLOCK_DURATION
-        logging.warning(f"ANOMALY DETECTED - IP: {source_ip} blocked for rate limiting.")
-        return jsonify({"error": "Too Many Requests", "message": "Rate limit exceeded. Your IP is blocked."}), 429
-    
-    # Add the current request to the tracker
-    request_tracker[source_ip].append(current_time)
-
-    # --- Security Check Logic ---
+    # Parse input
     try:
-        data = request.get_json()
-        user_input = data['input']
-        
-        # Check the input with my security function
-        is_attack, rule_name = check_for_attack(user_input)
+        data = request.get_json(force=True)
+        user_input = data.get("input", "")
+    except:
+        return jsonify({"error": "Invalid JSON"}), 400
 
-        if is_attack:
-            # If it is an attack, log it and block it
-            logging.warning(f"THREAT DETECTED - IP: {source_ip} - Rule: {rule_name} - Payload: \"{user_input}\"")
-            return jsonify({"error": "Forbidden", "message": "Malicious request blocked by WAF."}), 403
-        
-        # If it is not an attack, send success message
-        return jsonify({"message": f"Request processed successfully. Input was: '{user_input}'"}), 200
+    # Threat detection
+    is_attack, rule = check_for_attack(user_input, user_agent)
+    if is_attack:
+        logging.warning(f"THREAT - IP: {source_ip} - Rule: {rule} - Payload: {user_input!r}")
+        return jsonify({"error": "Forbidden", "rule": rule}), 403
 
-    except Exception as e:
-        return jsonify({"error": "Internal Server Error"}), 500
+    # Only now count this request for rate limiting
+    request_tracker[source_ip].append(now)
+
+    return jsonify({"message": "OK"}), 200
+
+@app.route("/logs")
+def logs_page():
+    return send_from_directory(app.static_folder, "logs.html")
+
+
+@app.route("/api/logs")
+def get_logs():
+    if not os.path.exists(LOG_FILE):
+        return jsonify([])
+    with open(LOG_FILE) as f:
+        return jsonify([{"entry": line.strip()} for line in f])
 
 if __name__ == '__main__':
+    print("✅ Flask server running on http://localhost:5002")
     app.run(debug=True, port=5002)

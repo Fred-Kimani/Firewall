@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WAF Logs</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input { margin-bottom: 10px; width: 300px; padding: 5px; }
+    pre { background: #f8f8f8; padding: 10px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Attack Logs</h1>
+  <input type="text" id="search" placeholder="Filter logs..." />
+  <div id="logs"></div>
+
+  <script>
+    const search = document.getElementById('search');
+    const logsDiv = document.getElementById('logs');
+
+    function fetchLogs() {
+      fetch('/api/logs')
+        .then(res => res.json())
+        .then(data => {
+          displayLogs(data);
+        });
+    }
+
+    function displayLogs(logs) {
+      const query = search.value.toLowerCase();
+      logsDiv.innerHTML = '';
+      logs
+        .filter(log => log.entry.toLowerCase().includes(query))
+        .forEach(log => {
+          const pre = document.createElement('pre');
+          pre.textContent = log.entry;
+          logsDiv.appendChild(pre);
+        });
+    }
+
+    search.addEventListener('input', () => fetchLogs());
+    fetchLogs();
+  </script>
+</body>
+</html>
